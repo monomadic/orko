@@ -7,6 +7,10 @@ authors = ["Rob Saunders <rob@wearebrandnew.com>"]
 sass-rs = "0.2"
 templar = { path = "../templar" }
 docopt = "0.8"
+filetime = "0.1"
+staticfile = "0.4.0"
+iron = "0.5.1"
+mount = "0.3.0"
 
 [lib]
 doc = false
