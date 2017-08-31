@@ -1,7 +1,10 @@
 use std::io;
 use std::env;
+use std::io::{Error, ErrorKind};
 
 use docopt::Docopt;
+
+use build;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
@@ -29,18 +32,28 @@ pub fn run_docopt() -> io::Result<()> {
         .unwrap_or_else(|e| e.exit());
 
     if args.get_bool("serve") {
-        let site = args.get_vec("<name>")[0];
-        let pwd = env::current_dir()?;
+        if args.get_vec("<name>").is_empty() {
+          // host all sites
+          println!("multi site not supported yet");
+        } else {
+          // host single site
+          let site = args.get_vec("<name>")[0];
+          let pwd = env::current_dir()?;
 
-        let source_directory = pwd.clone().push(site);
+          let mut source_directory = pwd.clone();
+          source_directory.push(site);
 
-        let mut target_directory = pwd.clone();
-        target_directory.push("_build");
-        target_directory.push(site);
+          let mut target_directory = pwd.clone();
+          target_directory.push("_build");
+          target_directory.push(site);
 
-        // let build_result = build::build(&source, &dest);
+          let build_result = build::build(&source_directory, &target_directory);
 
-
+          match build_result {
+            Ok(_) => println!("done."),
+            Err(e) => println!("error processing {:?}: {:?}", source_directory, e.kind()),
+          }
+        }
     }
     Ok(())
 }

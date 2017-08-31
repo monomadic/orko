@@ -4,3 +4,5 @@ extern crate sass_rs;
 extern crate docopt;
 
 pub mod command;
+
+mod build;
