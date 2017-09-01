@@ -58,7 +58,6 @@ pub fn build_path(path:&Path) -> bool {
 pub fn build(source: &Path, destination: &Path) -> io::Result<Vec<ProcessedFile>> {
     fs::create_dir_all(destination)?;
     let paths = read_directory_paths(source)?;
-    println!("paths {:?}", paths);
 
     Ok(paths.into_iter().flat_map(|path| {
         if build_path(&path) {
@@ -82,12 +81,10 @@ pub fn build(source: &Path, destination: &Path) -> io::Result<Vec<ProcessedFile>
             } else {
                 // file to process
                 let (action, result) : (BuildAction, Result<PathBuf, BuildErrorReason>) = match path.extension().and_then(|oss| oss.to_str()) {
-                    Some("templar") => {
-                        (
-                            BuildAction::Compile { extension: "templar".into(), destination: new_dest.clone() },
-                            compile_templar(source, &path, &new_dest)
-                        )
-                    },
+                    Some("templar") => {(
+                        BuildAction::Compile { extension: "templar".into(), destination: new_dest.clone() },
+                        compile_templar(source, &path, &new_dest)
+                    )},
                     _ => {
                         if same_attributes(&path, &new_dest) {
                             (BuildAction::Skip, Ok(source.to_path_buf()))

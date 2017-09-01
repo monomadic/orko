@@ -10,7 +10,7 @@ use pad::PadStr;
 //Compile { extension: String, destination: PathBuf },
 
 pub fn print_summary(path:&Path, result: io::Result<Vec<ProcessedFile>>) {
-    let l = format!("\n\n\nBuilding {:?}\n", path);
+    let l = format!("\nBuilding {}\n", path.to_str().unwrap());
     println!("{}", l.cyan());
 
     match result {

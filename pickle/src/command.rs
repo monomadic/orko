@@ -4,13 +4,14 @@ use std::thread;
 
 use docopt::Docopt;
 use watch;
+use colored::Colorize;
 
 use build;
 use serve;
 use output;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
-const SERVER_ADDRESS: &'static str = "127.0.0.1:3000";
+const SERVER_ADDRESS: &'static str = "127.0.0.1:9000";
 
 const USAGE: &'static str = "
 Pickels~! 🥒
@@ -51,9 +52,11 @@ pub fn run_docopt() -> io::Result<()> {
             target_directory.push(site);
 
             let build_result = build::build(&source_directory, &target_directory);
+            output::print_summary(&source_directory, build_result);
 
             if args.get_bool("serve") {
-                println!("single: {:?}", site);
+                let l = format!("\nServing {} at http://{}\n", site, SERVER_ADDRESS);
+                println!("{}", l.cyan());
 
                 let server_root = target_directory.clone();
                 let _ = thread::spawn(|| {
@@ -69,14 +72,13 @@ pub fn run_docopt() -> io::Result<()> {
                         Ok(watch::ChangeEvent{ path, op:_, cookie:_ }) => {
                             if let Some(_) = path {
                                 let build_result = build::build(&source_directory, &target_directory);
-                                // build_feedback::print_summary(&source_directory, build_result);
+                                output::print_summary(&source_directory, build_result);
                             }
                         },
                         Err(_) => break 'fs,
                     }
                 }
             }
-            output::print_summary(&source_directory, build_result);
         }
     }
 
