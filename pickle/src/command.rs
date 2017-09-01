@@ -3,11 +3,14 @@ use std::env;
 use std::thread;
 
 use docopt::Docopt;
+use watch;
 
 use build;
 use serve;
+use output;
 
 const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+const SERVER_ADDRESS: &'static str = "127.0.0.1:3000";
 
 const USAGE: &'static str = "
 Pickels~! 🥒
@@ -55,18 +58,25 @@ pub fn run_docopt() -> io::Result<()> {
                 let server_root = target_directory.clone();
                 let _ = thread::spawn(|| {
                     let _ = serve::serve(serve::ServerConfig {
-                        addr: "127.0.0.1:3000".parse().unwrap(),
+                        addr: SERVER_ADDRESS.parse().unwrap(),
                         root_dir: server_root,
                     });
                 });
-            }
 
-            // loop { }
-
-            match build_result {
-                Ok(_) => println!("done."),
-                Err(e) => println!("error processing {:?}: {:?}", source_directory, e.kind()),
+                let watcher = watch::watch(&source_directory);
+                'fs: loop {
+                    match watcher.change_events.recv() {
+                        Ok(watch::ChangeEvent{ path, op:_, cookie:_ }) => {
+                            if let Some(_) = path {
+                                let build_result = build::build(&source_directory, &target_directory);
+                                // build_feedback::print_summary(&source_directory, build_result);
+                            }
+                        },
+                        Err(_) => break 'fs,
+                    }
+                }
             }
+            output::print_summary(&source_directory, build_result);
         }
     }
 

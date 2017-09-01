@@ -11,6 +11,9 @@ filetime = "0.1"
 staticfile = "0.4.0"
 iron = "0.5.1"
 mount = "0.3.0"
+notify = "4.0"
+colored = "1.5"
+pad = "0.1"
 
 [lib]
 doc = false

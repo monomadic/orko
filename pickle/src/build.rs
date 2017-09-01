@@ -154,7 +154,8 @@ pub fn compile_templar(base_directory:&Path, source:&Path, destination:&Path) ->
 
     let empty_context = TemplateContext::empty();
 
-    templar::output::write_out(nodes.as_slice(), &empty_context, &mut file, 0, 2, &directive_handler)?;
+    let compile_result = templar::output::write_out(nodes.as_slice(), &empty_context, &mut file, 0, 2, &directive_handler)?;
+
     file.sync_all()?;
 
     Ok(base_directory.to_path_buf())
@@ -178,7 +179,7 @@ impl templar::output::DirectiveHandler for TemplarDirectiveHandler {
                 if let Some(second) = parts.get(1) {
                     let mut include_path = self.current_directory.clone();
                     include_path.push(second);
-                    include_path.set_extension("tlr");
+                    include_path.set_extension("templar");
 
                     let include_nodes = parse_template(&include_path).map_err(|e| {
                         DirectiveError {
