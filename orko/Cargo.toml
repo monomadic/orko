@@ -1,5 +1,5 @@
 [package]
-name = "pickle"
+name = "orko"
 version = "0.1.0"
 authors = ["Rob Saunders <rob@wearebrandnew.com>"]
 
@@ -19,5 +19,5 @@ pad = "0.1"
 doc = false
 
 [[bin]]
-name = "pickle"
+name = "orko"
 doc = false

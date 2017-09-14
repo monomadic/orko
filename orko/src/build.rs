@@ -18,6 +18,7 @@ pub struct ProcessedFile {
 
 struct TemplarDirectiveHandler {
     pub current_directory: PathBuf,
+    include_paths: Vec<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -143,7 +144,7 @@ pub fn same_attributes(a: &Path, b:&Path) -> bool {
 }
 
 pub fn compile_templar(base_directory:&Path, source:&Path, destination:&Path) -> Result<PathBuf, BuildErrorReason> {
-    let directive_handler = TemplarDirectiveHandler { current_directory: base_directory.to_path_buf() };
+    let mut directive_handler = TemplarDirectiveHandler { current_directory: base_directory.to_path_buf(), include_paths: vec![base_directory.to_path_buf()] };
 
     let nodes = parse_template(source)?;
     let out_path = destination.with_extension("html");
@@ -151,7 +152,7 @@ pub fn compile_templar(base_directory:&Path, source:&Path, destination:&Path) ->
 
     let empty_context = TemplateContext::empty();
 
-    let compile_result = templar::output::write_out(nodes.as_slice(), &empty_context, &mut file, 0, 2, &directive_handler)?;
+    let compile_result = templar::output::write_out(nodes.as_slice(), &empty_context, &mut file, 0, 2, &mut directive_handler)?;
 
     file.sync_all()?;
 
@@ -161,9 +162,67 @@ pub fn compile_templar(base_directory:&Path, source:&Path, destination:&Path) ->
 impl templar::output::DirectiveHandler for TemplarDirectiveHandler {
     type DirectiveError = DirectiveError;
 
-    fn handle<W>(&self, context:&TemplateContext, command: &str, children: &[Node], base_indent:usize, indent_size: usize, writer: &mut W) -> Result<(), DirectiveError> where W : Write {
+    fn handle<W>(&mut self, context:&TemplateContext, command: &str, children: &[Node], base_indent:usize, indent_size: usize, writer: &mut W) -> Result<(), DirectiveError> where W : Write {
         let parts : Vec<_> = command.split(" ").collect();
         match parts.first() {
+            Some(&"module") => {
+                if let Some(module) = parts.get(1) {
+                    let mut include_path = self.current_directory.clone();
+                    include_path.push("_modules");
+                    include_path.push(module);
+
+                    println!("adding {:?} to include_paths", include_path);
+                    self.include_paths.push(include_path);
+                    Ok(())
+                } else {
+                    Err(DirectiveError {
+                        directive: command.to_string(),
+                        reason: format!("no module supplied in module command.").to_string(),
+                    })
+                }
+            }
+            Some(&"module_include") => {
+                if let Some(module) = parts.get(1) {
+                    if let Some(page) = parts.get(2) {
+                        println!("module_include: {}", page);
+                        let mut include_path = self.current_directory.clone();
+                        include_path.push("_modules");
+                        include_path.push(module);
+                        include_path.push(page);
+                        include_path.set_extension("templar");
+
+                        let include_nodes = parse_template(&include_path).map_err(|e| {
+                            DirectiveError {
+                                directive: command.to_string(),
+                                reason: format!("{:?}", e)
+                            }
+                        })?;
+
+                        let context = TemplateContext {
+                            nodes: children.iter().cloned().collect(),
+                        };
+
+                        // check if file doesn't exist
+
+                        templar::output::write_out(include_nodes.as_slice(), &context, writer, base_indent, indent_size, self).map_err(|e| {
+                            DirectiveError {
+                                directive: command.to_string(),
+                                reason: format!("{:?}", e)
+                            }
+                        })
+                    } else {
+                        Err(DirectiveError {
+                            directive: command.to_string(),
+                            reason: format!("module_include must supply a partial name.").to_string(),
+                        })
+                    }
+                } else {
+                    Err(DirectiveError {
+                        directive: command.to_string(),
+                        reason: format!("no module supplied in module command.").to_string(),
+                    })
+                }
+            },
             Some(&"yield") => {
                 templar::output::write_out(context.nodes.as_slice(), &context, writer, base_indent, indent_size, self).map_err(|e| {
                     DirectiveError {

@@ -19,10 +19,10 @@ impl<DE> From<io::Error> for WriteError<DE> {
 
 pub trait DirectiveHandler {
     type DirectiveError;
-    fn handle<W>(&self, context:&TemplateContext, command: &str, children: &[Node], base_indent: usize, indent_size: usize, writer: &mut W) -> Result<(), Self::DirectiveError> where W : Write;
+    fn handle<W>(&mut self, context:&TemplateContext, command: &str, children: &[Node], base_indent: usize, indent_size: usize, writer: &mut W) -> Result<(), Self::DirectiveError> where W : Write;
 }
 
-pub fn write_out<W, DH>(nodes:&[Node], context:&TemplateContext, writer:&mut W, base_indent: usize, indent_size: usize, directive_handler:&DH) -> Result<(), WriteError<DH::DirectiveError>>
+pub fn write_out<W, DH>(nodes:&[Node], context:&TemplateContext, writer:&mut W, base_indent: usize, indent_size: usize, directive_handler:&mut DH) -> Result<(), WriteError<DH::DirectiveError>>
     where W : Write, DH: DirectiveHandler {
     for node in nodes {
         if node.should_indent() {

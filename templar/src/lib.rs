@@ -54,7 +54,6 @@ impl Node {
     }
 }
 
-
 pub fn element(name:&str, attributes: Vec<(&str, &str)>) -> Element {
     Element {
         name: name.into(),
