@@ -1,5 +1,5 @@
-extern crate pickle;
+extern crate orko;
 
 pub fn main() {
-    pickle::command::run_docopt().expect("success");
+    orko::command::run_docopt().expect("success");
 }
