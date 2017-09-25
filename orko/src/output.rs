@@ -23,7 +23,6 @@ pub fn print_summary(path:&Path, result: io::Result<Vec<ProcessedFile>>) {
                 files
             };
 
-
             for file in use_files {
                 let color = match file.action {
                     BuildAction::Skip => "magenta",
