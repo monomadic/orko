@@ -18,6 +18,7 @@ pub struct ProcessedFile {
 
 struct TemplarDirectiveHandler {
     pub current_directory: PathBuf,
+    pub destination_directory: PathBuf,
     include_paths: Vec<PathBuf>,
 }
 
@@ -82,10 +83,12 @@ pub fn build(source: &Path, destination: &Path) -> io::Result<Vec<ProcessedFile>
             } else {
                 // file to process
                 let (action, result) : (BuildAction, Result<PathBuf, BuildErrorReason>) = match path.extension().and_then(|oss| oss.to_str()) {
-                    Some("templar") => {(
-                        BuildAction::Compile { extension: "templar".into(), destination: new_dest.clone() },
-                        compile_templar(source, &path, &new_dest)
-                    )},
+                    Some("templar") => {
+                        (
+                            BuildAction::Compile { extension: "templar".into(), destination: new_dest.clone() },
+                            compile_templar(source, destination, &path, &new_dest)
+                        )
+                    },
                     Some("sass") => {(
                         BuildAction::Compile { extension: "sass".into(), destination: new_dest.clone() },
                         compile_sass(source, &path, &new_dest)
@@ -147,8 +150,11 @@ pub fn same_attributes(a: &Path, b:&Path) -> bool {
     }
 }
 
-pub fn compile_templar(base_directory:&Path, source:&Path, destination:&Path) -> Result<PathBuf, BuildErrorReason> {
-    let mut directive_handler = TemplarDirectiveHandler { current_directory: base_directory.to_path_buf(), include_paths: vec![base_directory.to_path_buf()] };
+pub fn compile_templar(base_directory:&Path, target_base_directory:&Path, source:&Path, destination:&Path) -> Result<PathBuf, BuildErrorReason> {
+    let mut directive_handler = TemplarDirectiveHandler {
+        current_directory: base_directory.to_path_buf(),
+        destination_directory: target_base_directory.to_path_buf(),
+        include_paths: vec![base_directory.to_path_buf()] };
 
     let nodes = parse_template(source)?;
     let out_path = destination.with_extension("html");
@@ -156,7 +162,7 @@ pub fn compile_templar(base_directory:&Path, source:&Path, destination:&Path) ->
 
     let empty_context = TemplateContext::empty();
 
-    let compile_result = templar::output::write_out(nodes.as_slice(), &empty_context, &mut file, 0, 2, &mut directive_handler)?;
+    let _ = templar::output::write_out(nodes.as_slice(), &empty_context, &mut file, 0, 2, &mut directive_handler)?;
 
     file.sync_all()?;
 
@@ -177,12 +183,24 @@ impl templar::output::DirectiveHandler for TemplarDirectiveHandler {
         match parts.first() {
             Some(&"module") => {
                 if let Some(module) = parts.get(1) {
-                    let mut include_path = (*self.current_directory.parent().expect("path to have a parent directory")).to_path_buf();
-                    include_path.push("_modules");
-                    include_path.push(module);
+                    let mut module_path = (*self.current_directory.parent().expect("path to have a parent directory")).to_path_buf();
+                    module_path.push("_modules");
+                    module_path.push(module);
 
-                    println!("adding {:?} to include_paths", include_path);
-                    self.include_paths.push(include_path);
+                    // process the module directory
+                    let build_result = build(&module_path, self.destination_directory.as_path());
+                    ::output::print_summary(&module_path, build_result);
+
+                    match build(&module_path, self.destination_directory.as_path()) {
+                        Err(e) => { return Err(DirectiveError {
+                            directive: command.to_string(),
+                            reason: format!("{:?}", e)
+                        })},
+                        _ => (),
+                    };
+
+                    // now add the module directory to the path, so partials can be processed.
+                    self.include_paths.push(module_path);
                     Ok(())
                 } else {
                     Err(DirectiveError {
