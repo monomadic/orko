@@ -86,6 +86,10 @@ pub fn build(source: &Path, destination: &Path) -> io::Result<Vec<ProcessedFile>
                         BuildAction::Compile { extension: "templar".into(), destination: new_dest.clone() },
                         compile_templar(source, &path, &new_dest)
                     )},
+                    Some("sass") => {(
+                        BuildAction::Compile { extension: "sass".into(), destination: new_dest.clone() },
+                        compile_sass(source, &path, &new_dest)
+                    )},
                     _ => {
                         if same_attributes(&path, &new_dest) {
                             (BuildAction::Skip, Ok(source.to_path_buf()))
@@ -156,6 +160,12 @@ pub fn compile_templar(base_directory:&Path, source:&Path, destination:&Path) ->
 
     file.sync_all()?;
 
+    Ok(base_directory.to_path_buf())
+}
+
+pub fn compile_sass(base_directory:&Path, source:&Path, destination:&Path) -> Result<PathBuf, BuildErrorReason> {
+    let out = sass_rs::compile_file(source, sass_rs::Options::default()).map_err(BuildErrorReason::Sass)?;
+    write_to_path(&out, destination.with_extension("css").as_path())?;
     Ok(base_directory.to_path_buf())
 }
 
