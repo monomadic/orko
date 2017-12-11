@@ -95,7 +95,12 @@ pub fn build(source: &Path, destination: &Path) -> io::Result<Vec<ProcessedFile>
                     )},
                     _ => {
                         if same_attributes(&path, &new_dest) {
-                            (BuildAction::Skip, Ok(source.to_path_buf()))
+                            // (BuildAction::Skip, Ok(source.to_path_buf()))
+                            ( BuildAction::Copy(new_dest.clone()),
+                            match copy_maintaining_modified_time(&path, &new_dest) {
+                                Ok(_) => Ok(source.to_path_buf()),
+                                Err(io) => Err(BuildErrorReason::IO(io)),
+                            } )
                         } else {
                             (
                                 BuildAction::Copy(new_dest.clone()),
@@ -194,7 +199,7 @@ impl templar::output::DirectiveHandler for TemplarDirectiveHandler {
                     match build(&module_path, self.destination_directory.as_path()) {
                         Err(e) => { return Err(DirectiveError {
                             directive: command.to_string(),
-                            reason: format!("{:?}", e)
+                            reason: format!("{}", e)
                         })},
                         _ => (),
                     };
@@ -209,48 +214,48 @@ impl templar::output::DirectiveHandler for TemplarDirectiveHandler {
                     })
                 }
             }
-            Some(&"module_include") => {
-                if let Some(module) = parts.get(1) {
-                    if let Some(page) = parts.get(2) {
-                        println!("module_include: {}", page);
-                        let mut include_path = self.current_directory.clone();
-                        include_path.push("_modules");
-                        include_path.push(module);
-                        include_path.push(page);
-                        include_path.set_extension("templar");
+            // Some(&"module_include") => {
+            //     if let Some(module) = parts.get(1) {
+            //         if let Some(page) = parts.get(2) {
+            //             println!("module_include: {}", page);
+            //             let mut include_path = self.current_directory.clone();
+            //             include_path.push("_modules");
+            //             include_path.push(module);
+            //             include_path.push(page);
+            //             include_path.set_extension("templar");
 
-                        let include_nodes = parse_template(&include_path).map_err(|e| {
-                            DirectiveError {
-                                directive: command.to_string(),
-                                reason: format!("{:?}", e)
-                            }
-                        })?;
+            //             let include_nodes = parse_template(&include_path).map_err(|e| {
+            //                 DirectiveError {
+            //                     directive: command.to_string(),
+            //                     reason: format!("{:?}", e)
+            //                 }
+            //             })?;
 
-                        let context = TemplateContext {
-                            nodes: children.iter().cloned().collect(),
-                        };
+            //             let context = TemplateContext {
+            //                 nodes: children.iter().cloned().collect(),
+            //             };
 
-                        // check if file doesn't exist
+            //             // check if file doesn't exist
 
-                        templar::output::write_out(include_nodes.as_slice(), &context, writer, base_indent, indent_size, self).map_err(|e| {
-                            DirectiveError {
-                                directive: command.to_string(),
-                                reason: format!("{:?}", e)
-                            }
-                        })
-                    } else {
-                        Err(DirectiveError {
-                            directive: command.to_string(),
-                            reason: format!("module_include must supply a partial name.").to_string(),
-                        })
-                    }
-                } else {
-                    Err(DirectiveError {
-                        directive: command.to_string(),
-                        reason: format!("no module supplied in module command.").to_string(),
-                    })
-                }
-            },
+            //             templar::output::write_out(include_nodes.as_slice(), &context, writer, base_indent, indent_size, self).map_err(|e| {
+            //                 DirectiveError {
+            //                     directive: command.to_string(),
+            //                     reason: format!("{:?}", e)
+            //                 }
+            //             })
+            //         } else {
+            //             Err(DirectiveError {
+            //                 directive: command.to_string(),
+            //                 reason: format!("module_include must supply a partial name.").to_string(),
+            //             })
+            //         }
+            //     } else {
+            //         Err(DirectiveError {
+            //             directive: command.to_string(),
+            //             reason: format!("no module supplied in module command.").to_string(),
+            //         })
+            //     }
+            // },
             Some(&"yield") => {
                 templar::output::write_out(context.nodes.as_slice(), &context, writer, base_indent, indent_size, self).map_err(|e| {
                     DirectiveError {
@@ -286,18 +291,31 @@ impl templar::output::DirectiveHandler for TemplarDirectiveHandler {
 
                         // write the file!
                         templar::output::write_out(include_nodes.as_slice(), &context, writer, base_indent, indent_size, self).map_err(|e| {
-                            DirectiveError {
-                                directive: command.to_string(),
-                                reason: format!("{:?}", e)
+                            match e {
+                                templar::output::WriteError::DirectiveError(err) => {
+                                    DirectiveError {
+                                        directive: command.to_string(),
+                                        reason: format!("{}", err.reason)
+                                    }
+                                },
+                                templar::output::WriteError::IO(err) => {
+                                    DirectiveError {
+                                        directive: command.to_string(),
+                                        reason: format!("{:?}", err)
+                                    }
+                                }
                             }
                         })
 
                     } else {
                         // no files found in include path
 
+                        let paths: String = self.include_paths.iter().map(|p|
+                            format!("\n    - {}", p.clone().into_os_string().into_string().unwrap())).collect();
+
                         Err(DirectiveError {
                             directive: command.to_string(),
-                            reason: format!("file not found in include paths: {:?}", self.include_paths),
+                            reason: format!("Could not find {} in the following paths:{}", second, paths),
                         })
                     }
 

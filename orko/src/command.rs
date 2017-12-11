@@ -52,6 +52,10 @@ pub fn run_docopt() -> io::Result<()> {
             target_directory.push(site);
 
             let build_result = build::build(&source_directory, &target_directory);
+
+            let l = format!("\nBuilding {}", source_directory.to_str().unwrap());
+            println!("{}", l.cyan());
+
             output::print_summary(&source_directory, build_result);
 
             if args.get_bool("serve") {
@@ -71,6 +75,9 @@ pub fn run_docopt() -> io::Result<()> {
                     match watcher.change_events.recv() {
                         Ok(watch::ChangeEvent{ path, op:_, cookie:_ }) => {
                             if let Some(_) = path {
+                                let l = format!("\nRebuilding {} at http://{}\n", site, SERVER_ADDRESS);
+                                println!("{}", l.cyan());
+
                                 let build_result = build::build(&source_directory, &target_directory);
                                 output::print_summary(&source_directory, build_result);
                             }

@@ -38,7 +38,7 @@ pub fn write_out<W, DH>(nodes:&[Node], context:&TemplateContext, writer:&mut W, 
                 writer.write(b"\n")?;
             }
             &Node::Directive { ref command, ref children } => {
-                println!("handle directive -> {:?} children {:?}", command, children);
+                // println!("handle directive -> {:?} children {:?}", command, children);
                 directive_handler.handle(context, command, children, base_indent, indent_size, writer).map_err(WriteError::DirectiveError)?;
             }
             &Node::Text(ref text) => {
