@@ -117,6 +117,14 @@ named!(javascript_line<&str, LineContent>,
     )
 );
 
+named!(css_line<&str, LineContent>,
+    do_parse!(
+        tag!(":css") >>
+        rr : rest >>
+        ( LineContent::StyleSheet )
+    )
+);
+
 named!(tag_element_line<&str, LineContent>,
     do_parse!(
         tag: identifier >>
@@ -159,7 +167,7 @@ named!(class_id_only_line<&str, LineContent>,
 );
 
 named!(line_p<&str, LineContent>,
-    alt_complete!(doctype_line | comment_line | javascript_line | tag_element_line | class_id_only_line | directive_line | text_line)
+    alt_complete!(doctype_line | comment_line | javascript_line | css_line | tag_element_line | class_id_only_line | directive_line | text_line)
 );
 
 #[derive(Debug)]
@@ -184,6 +192,7 @@ enum LineContent {
     Element(HtmlElement),
     Directive(String),
     Text(String),
+    StyleSheet,
 }
 
 fn indentation(str: &str) -> Option<usize> {
@@ -275,7 +284,9 @@ pub fn parse(content:&str) -> ParseResult {
         ter.iter().cloned().collect()
     };
 
+    // for each line in the current file,
     for (line_idx, line) in lines.iter().enumerate() {
+        // println!("line {}\n{}", line_idx, line);
         // indentation and slicing first
 //        println!("-> {}", line);
         if let Some(indent) = indentation(line) {
@@ -283,6 +294,7 @@ pub fn parse(content:&str) -> ParseResult {
 
 //            println!("!indent is {:?}", indent);
 
+            // while the next element on the stack is indented more than the current line,
             while contains(out_stack.last(), |&&(_, n)| n >= indent ) {
                 let (node, _) = out_stack.pop().expect("the top element");
 
@@ -310,11 +322,10 @@ pub fn parse(content:&str) -> ParseResult {
 
             match line_content_result {
                 IResult::Done(_, line_content) => {
-//                    println!("Done-> {}", format!("{:?}",line_content).green());
+                   println!("Done-> {}", format!("{:?}",line_content));
 
                     match (mode, line_content) {
                         (ParseMode::InlineJavascript, LineContent::Text(string)) => {
-//                            println!("!added some javascript content");
                             let &mut (ref mut next_down, _) = out_stack.last_mut().expect("a javascript node");
                             let node = Node::RawText(string);
                             if !next_down.append_child(node.clone()) {
@@ -335,8 +346,13 @@ pub fn parse(content:&str) -> ParseResult {
                                     // ignore
                                 },
                                 LineContent::Javascript => {
-//                                    println!("!javasript element, startin javascript mode");
                                     let mut ele = element("script", vec![("type", "text/javascript")]);
+                                    ele.children.push(Node::RawText("\n".into()));
+                                    mode = ParseMode::InlineJavascript;
+                                    out_stack.push((Node::Element(ele), indent));
+                                },
+                                LineContent::StyleSheet => {
+                                    let mut ele = element("style", vec![]);
                                     ele.children.push(Node::RawText("\n".into()));
                                     mode = ParseMode::InlineJavascript;
                                     out_stack.push((Node::Element(ele), indent));
